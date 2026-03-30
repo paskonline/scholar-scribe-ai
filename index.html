@@ -1,12 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LitMatrix AI</title>
     
-    <!-- Tailwind CSS for Styling -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        indigo: { 950: '#1e1b4b' }
+                    }
+                }
+            }
+        }
+    </script>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -19,43 +31,150 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
 
+    <!-- Firebase Import Map -->
+    <script type="importmap">
+      {
+        "imports": {
+          "firebase/app": "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js",
+          "firebase/auth": "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js",
+          "firebase/firestore": "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"
+        }
+      }
+    </script>
+
     <script>
-        // PDF.js worker setup
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
     </script>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 font-sans min-h-screen flex flex-col transition-colors duration-300">
     <div id="root" class="flex flex-col flex-grow"></div>
 
-    <script type="text/babel">
+    <script type="text/babel" data-type="module">
+        // Use global React object instead of import to avoid module resolution errors
         const { useState, useEffect, useRef } = React;
+        
+        import { initializeApp } from 'firebase/app';
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+        import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 
-        // --- SVG Icons ---
-        const IconUpload = () => <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>;
+        // --- Firebase Setup ---
+        const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+        const app = firebaseConfigStr ? initializeApp(JSON.parse(firebaseConfigStr)) : null;
+        const auth = app ? getAuth(app) : null;
+        const db = app ? getFirestore(app) : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // --- Icons ---
+        const IconUpload = () => <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>;
         const IconDownload = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>;
         const IconSave = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>;
         const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>;
-        const IconInfo = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
-        const IconVideo = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>;
-        const IconCheck = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>;
+        const IconInfo = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
+        const IconGoogle = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>;
+        const IconMoon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>;
+        const IconSun = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>;
+        const IconUser = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>;
+
+        // --- Tooltip Component ---
+        const TooltipButton = ({ icon, text, tooltip, onClick, className, asLabel, children }) => {
+            const content = (
+                <div className="relative group flex flex-col items-center">
+                    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all cursor-pointer shadow-sm active:scale-95 ${className}`} onClick={!asLabel ? onClick : undefined}>
+                        {icon} <span className="hidden md:inline font-medium">{text}</span>
+                        <IconInfo className="w-3 h-3 opacity-60 ml-0.5" />
+                        {children}
+                    </div>
+                    <div className="absolute top-full mt-2 hidden group-hover:block w-48 p-2.5 bg-slate-800 dark:bg-slate-700 text-white text-xs rounded-xl shadow-xl z-50 text-center animate-fade-in border border-slate-600">
+                        {tooltip}
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-slate-800 dark:border-b-slate-700"></div>
+                    </div>
+                </div>
+            );
+            return asLabel ? <label>{content}</label> : content;
+        };
 
         function App() {
-            // Internal keys kept as 'nsbm_lit_key' so previous data isn't lost for the user
+            // State
             const [apiKey, setApiKey] = useState(() => localStorage.getItem('nsbm_lit_key') || '');
             const [isKeySaved, setIsKeySaved] = useState(() => !!localStorage.getItem('nsbm_lit_key'));
             const [showApiInfo, setShowApiInfo] = useState(false);
-            const [summaries, setSummaries] = useState(() => {
-                const saved = localStorage.getItem('nsbm_lit_data');
-                return saved ? JSON.parse(saved) : [];
-            });
+            const [summaries, setSummaries] = useState([]);
             const [isProcessing, setIsProcessing] = useState(false);
             const [progressText, setProgressText] = useState('');
+            const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
+            const [user, setUser] = useState(null);
+            
             const fileInputRef = useRef(null);
             const importInputRef = useRef(null);
 
+            // Theme Effect
             useEffect(() => {
-                localStorage.setItem('nsbm_lit_data', JSON.stringify(summaries));
-            }, [summaries]);
+                if (darkMode) {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
+                }
+            }, [darkMode]);
+
+            // Firebase Auth Init
+            useEffect(() => {
+                if (!auth) return;
+                
+                const initAuth = async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (err) {
+                        console.error("Auth Init Error:", err);
+                    }
+                };
+                initAuth();
+
+                const unsub = onAuthStateChanged(auth, (currentUser) => {
+                    setUser(currentUser);
+                });
+                return () => unsub();
+            }, []);
+
+            // Firestore Data Sync
+            useEffect(() => {
+                if (!user || !db) return;
+
+                const summariesRef = collection(db, 'artifacts', appId, 'users', user.uid, 'research_summaries');
+                const unsub = onSnapshot(summariesRef, (snapshot) => {
+                    const data = [];
+                    snapshot.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
+                    data.sort((a, b) => b.createdAt - a.createdAt);
+                    setSummaries(data);
+                }, (error) => {
+                    console.error("Firestore Error:", error);
+                });
+
+                return () => unsub();
+            }, [user]);
+
+            const handleGoogleLogin = async () => {
+                if (!auth) return alert("Firebase is not configured in this environment.");
+                try {
+                    const provider = new GoogleAuthProvider();
+                    await signInWithPopup(auth, provider);
+                } catch (error) {
+                    console.error("Google Login Error", error);
+                    alert("Google Sign-In failed. It may be blocked inside iframes. The environment has already secured your session anonymously!");
+                }
+            };
+
+            const handleLogout = async () => {
+                if (auth) {
+                    await signOut(auth);
+                    setSummaries([]); // Clear UI immediately
+                }
+            };
 
             const handleSaveKey = () => {
                 if (apiKey.trim()) {
@@ -77,7 +196,7 @@
                         const arrayBuffer = e.target.result;
                         try {
                             if (file.type === 'application/pdf') {
-                                setProgressText('Reading PDF...');
+                                setProgressText('Reading PDF text...');
                                 const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                                 let fullText = '';
                                 const maxPages = Math.min(pdf.numPages, 12); 
@@ -109,29 +228,29 @@
                     type: "OBJECT",
                     properties: {
                         relevantJournalArticle: { type: "STRING", description: "Title of the journal article" },
-                        author: { type: "STRING", description: "Authors of the article" },
-                        year: { type: "STRING", description: "Year of publication" },
-                        publisherJournalName: { type: "STRING", description: "Name of the journal or publisher" },
-                        journalRankIndexedJournal: { type: "STRING", description: "Rank or indexing status. Put 'Not specified' if absent." },
-                        linkForBaseArticle: { type: "STRING", description: "DOI or URL of the article" },
-                        theoreticalFacts: { type: "STRING", description: "Theoretical facts of the problem background with citations" },
-                        practicalFacts: { type: "STRING", description: "Practical facts of the problem background with citations" },
-                        mainObjective: { type: "STRING", description: "Main objective of the research" },
-                        specificObjectives: { type: "STRING", description: "Specific objectives of the research" },
-                        mainResearchQuestion: { type: "STRING", description: "The primary research question" },
-                        specificResearchQuestions: { type: "STRING", description: "Secondary or specific research questions" },
-                        hypothesis: { type: "STRING", description: "The hypotheses proposed in the study" },
+                        author: { type: "STRING", description: "Authors" },
+                        year: { type: "STRING", description: "Year" },
+                        publisherJournalName: { type: "STRING", description: "Journal/Publisher name" },
+                        journalRankIndexedJournal: { type: "STRING", description: "Rank/Indexing status (e.g., Scopus)" },
+                        linkForBaseArticle: { type: "STRING", description: "DOI or URL" },
+                        theoreticalFacts: { type: "STRING", description: "Theoretical facts of problem background with citations" },
+                        practicalFacts: { type: "STRING", description: "Practical facts of problem background with citations" },
+                        mainObjective: { type: "STRING", description: "Main objective" },
+                        specificObjectives: { type: "STRING", description: "Specific objectives" },
+                        mainResearchQuestion: { type: "STRING", description: "Main research question" },
+                        specificResearchQuestions: { type: "STRING", description: "Specific research questions" },
+                        hypothesis: { type: "STRING", description: "Hypotheses" },
                         population: { type: "STRING", description: "Target population" },
-                        samplingMethod: { type: "STRING", description: "Method used for sampling" },
-                        sampleSize: { type: "STRING", description: "The exact sample size" },
-                        dataAnalysisMethod: { type: "STRING", description: "Method of data analysis" }
+                        samplingMethod: { type: "STRING", description: "Sampling method" },
+                        sampleSize: { type: "STRING", description: "Exact sample size" },
+                        dataAnalysisMethod: { type: "STRING", description: "Data analysis method" }
                     }
                 };
 
                 const payload = {
                     contents: [{ parts: [{ text: promptText }] }],
                     generationConfig: { responseMimeType: "application/json", responseSchema: schema },
-                    systemInstruction: { parts: [{ text: "You are an expert academic research assistant. Extract data accurately from the provided research paper text into the specified structure. If a field is not explicitly mentioned, summarize the closest relevant information or output 'Not explicitly stated'." }] }
+                    systemInstruction: { parts: [{ text: "Extract data accurately from the provided research paper into the specified structure. If a field is not explicitly mentioned, output 'Not explicitly stated'." }] }
                 };
 
                 const response = await fetch(url, {
@@ -140,7 +259,7 @@
                     body: JSON.stringify(payload)
                 });
                 
-                if (!response.ok) throw new Error("API Key might be invalid, or API quota exceeded.");
+                if (!response.ok) throw new Error("API Key invalid or quota exceeded.");
                 const data = await response.json();
                 return JSON.parse(data.candidates[0].content.parts[0].text);
             };
@@ -148,22 +267,24 @@
             const handleFileUpload = async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                if (!isKeySaved) {
-                    alert("Please enter your Gemini API Key first!");
-                    return;
-                }
+                if (!isKeySaved) return alert("Please save your Gemini API Key first!");
+                if (!user || !db) return alert("Cloud sync is not ready yet.");
 
                 setIsProcessing(true);
                 try {
                     const text = await extractTextFromFile(file);
                     const truncatedText = text.substring(0, 60000); 
                     
-                    setProgressText('Analyzing with AI...');
-                    const prompt = `Please analyze the following text extracted from a research paper. Extract the exact information required to fill out my literature review matrix columns.\n\nPaper Text:\n${truncatedText}`;
+                    setProgressText('Analyzing with Gemini AI...');
+                    const summaryData = await callGemini(`Analyze the following research paper and extract details for a literature matrix:\n\n${truncatedText}`);
                     
-                    const summaryData = await callGemini(prompt);
+                    // Save to Firestore
+                    setProgressText('Saving to Cloud...');
+                    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'research_summaries'), {
+                        ...summaryData,
+                        createdAt: Date.now()
+                    });
                     
-                    setSummaries(prev => [...prev, { id: Date.now(), ...summaryData }]);
                     setProgressText('Done!');
                 } catch (error) {
                     alert("Error: " + error.message);
@@ -173,46 +294,29 @@
                 if (fileInputRef.current) fileInputRef.current.value = '';
             };
 
-            const deleteSummary = (id) => {
+            const deleteSummary = async (id) => {
                 if(confirm("Are you sure you want to delete this row?")) {
-                    setSummaries(summaries.filter(s => s.id !== id));
+                    if (db && user) {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'research_summaries', id));
+                    }
                 }
             };
 
+            // EXPORTS
             const exportToCSV = () => {
                 if (summaries.length === 0) return;
-                const headers = [
-                    "No", "Relevant Journal Article", "Author", "Year", "Publisher / Journal Name", 
-                    "Journal Rank/ Indexed Journal", "Link for the Base Article", 
-                    "Problem Background: Theoretical Facts", "Problem Background: Practical Facts", 
-                    "Research Objectives: Main Objective", "Research Objectives: Specific Objectives", 
-                    "Research Questions: Main Research Question", "Research Questions: Specific Research Questions", 
-                    "Hypothesis", "Proposed Methods: Population", "Proposed Methods: Sampling Method", 
-                    "Proposed Methods: Sample Size", "Proposed Methods: Data Analysis Method"
-                ];
+                const headers = ["No", "Relevant Journal Article", "Author", "Year", "Publisher / Journal Name", "Journal Rank", "Link", "Theoretical Facts", "Practical Facts", "Main Objective", "Specific Objectives", "Main RQ", "Specific RQs", "Hypothesis", "Population", "Sampling Method", "Sample Size", "Data Analysis Method"];
                 
                 const csvRows = [headers.join(",")];
-
                 summaries.forEach((row, index) => {
                     const values = [
                         index + 1,
-                        `"${(row.relevantJournalArticle || '').replace(/"/g, '""')}"`, 
-                        `"${(row.author || '').replace(/"/g, '""')}"`, 
-                        `"${(row.year || '').replace(/"/g, '""')}"`, 
-                        `"${(row.publisherJournalName || '').replace(/"/g, '""')}"`, 
-                        `"${(row.journalRankIndexedJournal || '').replace(/"/g, '""')}"`, 
-                        `"${(row.linkForBaseArticle || '').replace(/"/g, '""')}"`, 
-                        `"${(row.theoreticalFacts || '').replace(/"/g, '""')}"`, 
-                        `"${(row.practicalFacts || '').replace(/"/g, '""')}"`, 
-                        `"${(row.mainObjective || '').replace(/"/g, '""')}"`, 
-                        `"${(row.specificObjectives || '').replace(/"/g, '""')}"`, 
-                        `"${(row.mainResearchQuestion || '').replace(/"/g, '""')}"`, 
-                        `"${(row.specificResearchQuestions || '').replace(/"/g, '""')}"`, 
-                        `"${(row.hypothesis || '').replace(/"/g, '""')}"`, 
-                        `"${(row.population || '').replace(/"/g, '""')}"`, 
-                        `"${(row.samplingMethod || '').replace(/"/g, '""')}"`, 
-                        `"${(row.sampleSize || '').replace(/"/g, '""')}"`, 
-                        `"${(row.dataAnalysisMethod || '').replace(/"/g, '""')}"`
+                        ...headers.slice(1).map(key => {
+                            // map headers to object keys loosely
+                            const objKey = Object.keys(row).find(k => k.toLowerCase().includes(key.toLowerCase().split(' ')[0]));
+                            const val = row[objKey] || row[key.charAt(0).toLowerCase() + key.slice(1).replace(/ /g, '')] || '';
+                            return `"${String(val).replace(/"/g, '""')}"`;
+                        })
                     ];
                     csvRows.push(values.join(","));
                 });
@@ -231,14 +335,20 @@
                 link.click();
             };
 
-            const importBackup = (e) => {
+            const importBackup = async (e) => {
                 const file = e.target.files[0];
-                if (!file) return;
+                if (!file || !user || !db) return;
                 const reader = new FileReader();
-                reader.onload = (e) => {
+                reader.onload = async (e) => {
                     try {
                         const importedData = JSON.parse(e.target.result);
-                        setSummaries(importedData);
+                        for (const item of importedData) {
+                            await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'research_summaries'), {
+                                ...item,
+                                createdAt: Date.now()
+                            });
+                        }
+                        alert("Backup restored to cloud successfully!");
                     } catch (err) {
                         alert("Invalid backup file.");
                     }
@@ -249,180 +359,198 @@
 
             return (
                 <div className="flex-grow flex flex-col">
-                    {/* Header - Improved mobile wrapping */}
-                    <header className="bg-indigo-900 text-white p-4 shadow-md flex flex-col sm:flex-row justify-between items-center sticky top-0 z-50 gap-4 sm:gap-0">
-                        <div className="flex items-center gap-2">
-                            <div className="bg-indigo-600 p-2 rounded-lg">
-                                <IconSave />
+                    {/* Header */}
+                    <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4 sticky top-0 z-50 transition-colors">
+                        <div className="max-w-[1600px] mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+                            
+                            <div className="flex items-center gap-3">
+                                <div className="bg-indigo-600 dark:bg-indigo-500 p-2 rounded-xl text-white shadow-md">
+                                    <IconSave />
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">LitMatrix AI</h1>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Research Assistant</p>
+                                </div>
                             </div>
-                            <h1 className="text-xl font-bold tracking-tight">LitMatrix AI</h1>
-                        </div>
-                        <div className="flex flex-wrap justify-center gap-2 w-full sm:w-auto">
-                            <button onClick={exportBackup} className="bg-indigo-800 hover:bg-indigo-700 border border-indigo-700 px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 transition-colors">
-                                <IconSave/> <span className="hidden md:inline">Backup Data</span>
-                            </button>
-                            <label className="bg-indigo-800 hover:bg-indigo-700 border border-indigo-700 px-3 py-1.5 rounded-lg text-sm cursor-pointer flex items-center gap-2 transition-colors">
-                                <IconUpload/> <span className="hidden md:inline">Restore Data</span>
-                                <input type="file" accept=".json" onChange={importBackup} ref={importInputRef} className="hidden" />
-                            </label>
-                            <button onClick={exportToCSV} className="bg-white text-indigo-900 font-semibold hover:bg-slate-100 px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 transition-colors">
-                                <IconDownload/> Export CSV
-                            </button>
+
+                            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0">
+                                {/* Actions with Tooltips */}
+                                <TooltipButton 
+                                    icon={<IconSave className="w-4 h-4" />} 
+                                    text="Backup" 
+                                    tooltip="Download your matrix as a JSON file to save locally." 
+                                    onClick={exportBackup} 
+                                    className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700" 
+                                />
+                                <TooltipButton 
+                                    asLabel 
+                                    icon={<IconUpload className="w-4 h-4" />} 
+                                    text="Restore" 
+                                    tooltip="Upload a previously saved JSON backup to merge into your current view." 
+                                    className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                                >
+                                    <input type="file" accept=".json" onChange={importBackup} ref={importInputRef} className="hidden" />
+                                </TooltipButton>
+                                <TooltipButton 
+                                    icon={<IconDownload className="w-4 h-4" />} 
+                                    text="Export CSV" 
+                                    tooltip="Export your completed matrix to Excel for your thesis." 
+                                    onClick={exportToCSV} 
+                                    className="bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-800/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800" 
+                                />
+                                
+                                <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+                                
+                                {/* Theme & Auth */}
+                                <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors" title="Toggle Dark Mode">
+                                    {darkMode ? <IconSun /> : <IconMoon />}
+                                </button>
+                                
+                                {user && !user.isAnonymous ? (
+                                    <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-700 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 border border-slate-200 dark:border-slate-700 text-sm font-medium transition-colors" title="Sign out">
+                                        <IconUser /> <span className="hidden md:inline">{user.email || 'Logged In'}</span>
+                                    </button>
+                                ) : (
+                                    <button onClick={handleGoogleLogin} className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 text-sm font-medium shadow-sm transition-all hover:shadow">
+                                        <IconGoogle /> <span className="hidden sm:inline">Sign in</span>
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </header>
 
-                    <main className="p-4 md:p-6 flex-grow flex flex-col mx-auto w-full max-w-[1600px]">
+                    <main className="p-4 md:p-8 flex-grow flex flex-col mx-auto w-full max-w-[1600px] gap-6">
                         
-                        {/* API Key Setup */}
-                        <div className="w-full max-w-3xl mx-auto mb-6">
+                        {/* API Key Panel (Glassmorphism) */}
+                        <div className="w-full max-w-2xl mx-auto">
                             {!isKeySaved ? (
-                                <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm">
+                                <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-md border border-slate-200 dark:border-slate-700 p-6 rounded-2xl shadow-sm">
                                     <div className="flex items-center gap-2 mb-2">
-                                        <h2 className="text-lg font-bold text-slate-800">1. Setup AI Connection</h2>
-                                        <button 
-                                            onClick={() => setShowApiInfo(!showApiInfo)} 
-                                            className="text-indigo-500 hover:text-indigo-700 transition-colors p-1 bg-indigo-50 rounded-full"
-                                            title="How to get a key?"
-                                        >
-                                            <IconInfo/>
-                                        </button>
+                                        <h2 className="text-lg font-bold text-slate-800 dark:text-white">1. Connect Gemini AI</h2>
                                     </div>
-                                    <p className="text-sm text-slate-500 mb-4">Your key is stored securely on your local device only.</p>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Paste your free API key. It stays securely in your browser.</p>
                                     
-                                    {/* Instructional Dropdown */}
-                                    {showApiInfo && (
-                                        <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-4 text-sm text-indigo-900 animate-fade-in">
-                                            <p className="font-semibold mb-2 text-indigo-800 text-base">Detailed steps to get your free Gemini API Key:</p>
-                                            <ol className="list-decimal ml-5 space-y-2 mb-4 text-slate-700">
-                                                <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="underline font-bold text-indigo-700 hover:text-indigo-500">Google AI Studio</a>.</li>
-                                                <li>Sign in using your standard Google Account.</li>
-                                                <li>Click the blue button that says <strong>"Create API key"</strong>.</li>
-                                                <li>In the popup window, click <strong>"Create API key in a new project"</strong>.</li>
-                                                <li>Wait a few seconds for Google to generate your unique key.</li>
-                                                <li>Click <strong>"Copy"</strong>. The key will look like a long string of random letters starting with <code>AIzaSy...</code></li>
-                                                <li>Come back here, paste the key into the box below, and click Save!</li>
-                                            </ol>
-                                            <a href="https://www.youtube.com/results?search_query=how+to+get+google+gemini+api+key" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 bg-white border border-indigo-200 px-3 py-1.5 rounded-lg text-indigo-600 hover:bg-indigo-100 transition-colors font-medium shadow-sm">
-                                                <IconVideo/> Watch a video tutorial
-                                            </a>
-                                        </div>
-                                    )}
-
-                                    <div className="flex flex-col sm:flex-row gap-2">
+                                    <div className="flex flex-col sm:flex-row gap-3">
                                         <input 
                                             type="password" 
                                             value={apiKey} 
                                             onChange={(e) => setApiKey(e.target.value)} 
-                                            placeholder="Paste your AIzaSy... key here" 
-                                            className="border border-slate-300 rounded-xl px-4 py-2.5 w-full flex-grow focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" 
+                                            placeholder="AIzaSy..." 
+                                            className="border border-slate-300 dark:border-slate-600 rounded-xl px-4 py-2.5 w-full flex-grow focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-900 dark:text-white transition-all shadow-inner" 
                                         />
-                                        <button onClick={handleSaveKey} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl hover:bg-indigo-700 font-medium transition-colors whitespace-nowrap">
+                                        <button onClick={handleSaveKey} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl hover:bg-indigo-700 font-medium transition-colors whitespace-nowrap shadow-sm">
                                             Save Key
                                         </button>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="flex justify-end items-center mb-2">
-                                    <div className="flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 mr-3 font-medium">
-                                        <IconCheck/> API Key Connected
+                                <div className="flex justify-end items-center">
+                                    <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-2 rounded-full border border-emerald-200 dark:border-emerald-800/50 mr-4 font-medium shadow-sm">
+                                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div> API Connected
                                     </div>
-                                    <button onClick={handleClearKey} className="text-xs text-slate-400 hover:text-red-500 hover:underline transition-colors">Change Key</button>
+                                    <button onClick={handleClearKey} className="text-xs text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors">Change Key</button>
                                 </div>
                             )}
                         </div>
 
-                        {/* Upload Area */}
-                        <div className={`bg-white border-2 border-dashed ${isProcessing ? 'border-indigo-400 bg-indigo-50' : 'border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/50'} rounded-2xl p-6 md:p-10 mb-8 text-center relative transition-all shadow-sm w-full max-w-3xl mx-auto`}>
+                        {/* Drag & Drop Upload */}
+                        <div className={`bg-white dark:bg-slate-800 border-2 border-dashed ${isProcessing ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-slate-700'} rounded-3xl p-8 md:p-12 text-center relative transition-all shadow-sm w-full max-w-2xl mx-auto group`}>
                             <input type="file" ref={fileInputRef} accept=".pdf,.docx" onChange={handleFileUpload} disabled={isProcessing || !isKeySaved} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10" />
-                            <div className="flex flex-col items-center justify-center text-slate-500">
+                            <div className="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400">
                                 {isProcessing ? (
                                     <div className="flex flex-col items-center">
-                                        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-3"></div>
-                                        <div className="font-semibold text-indigo-700">{progressText}</div>
+                                        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                                        <div className="font-semibold text-indigo-700 dark:text-indigo-400 animate-pulse">{progressText}</div>
                                     </div>
                                 ) : (
                                     <>
-                                        <div className={`mb-3 ${isKeySaved ? 'text-indigo-500' : 'text-slate-300'}`}><IconUpload/></div>
-                                        <h2 className="text-lg font-bold text-slate-800 mb-1">2. Upload Journal Article</h2>
-                                        <p className="text-sm">Supports .PDF or .DOCX format.</p>
-                                        {!isKeySaved && <p className="text-xs text-red-400 mt-2 bg-red-50 px-2 py-1 rounded">Requires API Key to upload</p>}
+                                        <div className={`mb-4 transition-transform group-hover:-translate-y-1 ${isKeySaved ? 'text-indigo-500' : 'text-slate-300 dark:text-slate-600'}`}><IconUpload/></div>
+                                        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">2. Drop Journal Article Here</h2>
+                                        <p className="text-sm">We'll read the methodology and add it to your matrix.</p>
+                                        {!isKeySaved && <p className="text-xs text-red-500 dark:text-red-400 mt-3 font-medium">Please enter API Key first</p>}
                                     </>
                                 )}
                             </div>
                         </div>
 
-                        {/* Full Matrix Table */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-grow h-[60vh] relative overflow-hidden flex flex-col">
-                            <div className="overflow-x-auto overflow-y-auto flex-grow" style={{ WebkitOverflowScrolling: 'touch' }}>
-                                <table className="w-full text-sm text-left whitespace-nowrap border-collapse min-w-max">
-                                    <thead className="bg-slate-100 text-slate-600 uppercase text-xs font-semibold border-b border-slate-200 sticky top-0 z-20 shadow-sm">
+                        {/* --- Mobile Card View (< md screens) --- */}
+                        <div className="md:hidden space-y-4 pb-10">
+                            {summaries.length === 0 && (
+                                <div className="text-center py-10 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                    No articles summarized yet. Upload your first PDF.
+                                </div>
+                            )}
+                            {summaries.map((row, idx) => (
+                                <div key={row.id} className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col gap-3 relative overflow-hidden">
+                                    <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-500"></div>
+                                    <div className="flex justify-between items-start">
+                                        <h3 className="font-bold text-slate-800 dark:text-slate-100 pr-8 leading-tight">{row.relevantJournalArticle}</h3>
+                                        <button onClick={() => deleteSummary(row.id)} className="text-slate-400 hover:text-red-500 bg-slate-50 dark:bg-slate-700 p-2 rounded-lg absolute top-4 right-4"><IconTrash/></button>
+                                    </div>
+                                    <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">{row.author} ({row.year})</p>
+                                    
+                                    <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-3 text-sm space-y-2 mt-2">
+                                        <p><span className="font-semibold text-slate-700 dark:text-slate-300">Objectives:</span> {row.mainObjective}</p>
+                                        <p><span className="font-semibold text-slate-700 dark:text-slate-300">Methodology:</span> {row.sampleSize} ({row.population}) using {row.dataAnalysisMethod}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* --- Desktop Table View (>= md screens) --- */}
+                        <div className="hidden md:flex bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex-grow h-[60vh] relative overflow-hidden flex-col">
+                            <div className="overflow-x-auto overflow-y-auto flex-grow styled-scrollbar">
+                                <table className="w-full text-sm text-left border-collapse">
+                                    <thead className="bg-slate-100 dark:bg-slate-900/80 text-slate-600 dark:text-slate-400 uppercase text-xs font-bold border-b border-slate-200 dark:border-slate-700 sticky top-0 z-20 shadow-sm backdrop-blur-md">
                                         <tr>
-                                            <th className="px-4 py-3 sticky left-0 bg-slate-100 z-30 border-r border-slate-200 text-center">No</th>
-                                            {/* Note: Left sticky disabled on mobile for better UX, enabled on md+ screens */}
-                                            <th className="px-4 py-3 sticky md:left-12 bg-slate-100 z-30 border-r border-slate-200 w-48">Article Title</th>
-                                            
-                                            <th className="px-4 py-3 border-r border-slate-200">Author</th>
-                                            <th className="px-4 py-3 border-r border-slate-200">Year</th>
-                                            <th className="px-4 py-3 border-r border-slate-200">Publisher / Journal</th>
-                                            <th className="px-4 py-3 border-r border-slate-200">Rank/ Indexed</th>
-                                            <th className="px-4 py-3 border-r border-slate-200">Link</th>
-                                            
-                                            <th className="px-4 py-3 border-r border-slate-200 bg-blue-50/60 text-blue-800">Theoretical Facts</th>
-                                            <th className="px-4 py-3 border-r border-slate-200 bg-blue-50/60 text-blue-800">Practical Facts</th>
-                                            
-                                            <th className="px-4 py-3 border-r border-slate-200 bg-purple-50/60 text-purple-800">Main Objective</th>
-                                            <th className="px-4 py-3 border-r border-slate-200 bg-purple-50/60 text-purple-800">Specific Objectives</th>
-                                            
-                                            <th className="px-4 py-3 border-r border-slate-200 bg-amber-50/60 text-amber-800">Main RQ</th>
-                                            <th className="px-4 py-3 border-r border-slate-200 bg-amber-50/60 text-amber-800">Specific RQs</th>
-                                            
-                                            <th className="px-4 py-3 border-r border-slate-200">Hypothesis</th>
-                                            
-                                            <th className="px-4 py-3 border-r border-slate-200 bg-emerald-50/60 text-emerald-800">Population</th>
-                                            <th className="px-4 py-3 border-r border-slate-200 bg-emerald-50/60 text-emerald-800">Sampling Method</th>
-                                            <th className="px-4 py-3 border-r border-slate-200 bg-emerald-50/60 text-emerald-800">Sample Size</th>
-                                            <th className="px-4 py-3 border-r border-slate-200 bg-emerald-50/60 text-emerald-800">Analysis Method</th>
-                                            
-                                            <th className="px-4 py-3 text-center sticky right-0 bg-slate-100 z-30 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)]">Action</th>
+                                            <th className="p-4 sticky left-0 bg-slate-100 dark:bg-slate-900 z-30 border-r border-slate-200 dark:border-slate-700 text-center w-12">No</th>
+                                            <th className="p-4 sticky left-12 bg-slate-100 dark:bg-slate-900 z-30 border-r border-slate-200 dark:border-slate-700 w-64 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]">Article Title</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 min-w-[150px]">Author</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700">Year</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 min-w-[150px]">Journal</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-blue-50/50 dark:bg-blue-900/10 text-blue-800 dark:text-blue-300 min-w-[300px]">Theoretical Facts</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-blue-50/50 dark:bg-blue-900/10 text-blue-800 dark:text-blue-300 min-w-[300px]">Practical Facts</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-purple-50/50 dark:bg-purple-900/10 text-purple-800 dark:text-purple-300 min-w-[250px]">Main Objective</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-amber-50/50 dark:bg-amber-900/10 text-amber-800 dark:text-amber-300 min-w-[250px]">Main RQ</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-emerald-50/50 dark:bg-emerald-900/10 text-emerald-800 dark:text-emerald-300 min-w-[180px]">Population</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-emerald-50/50 dark:bg-emerald-900/10 text-emerald-800 dark:text-emerald-300 min-w-[150px]">Sample Size</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-emerald-50/50 dark:bg-emerald-900/10 text-emerald-800 dark:text-emerald-300 min-w-[200px]">Analysis Method</th>
+                                            <th className="p-4 text-center sticky right-0 bg-slate-100 dark:bg-slate-900 z-30 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] dark:shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.5)]">Delete</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
+                                    <tbody className="text-slate-700 dark:text-slate-300">
                                         {summaries.length === 0 && (
-                                            <tr><td colSpan="19" className="text-center py-16 text-slate-400">No articles summarized yet. Upload a document to begin filling your matrix.</td></tr>
+                                            <tr><td colSpan="13" className="text-center py-20 text-slate-400 dark:text-slate-500">No articles summarized yet. Upload a document to begin filling your matrix.</td></tr>
                                         )}
                                         {summaries.map((row, idx) => (
-                                            <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50/80 align-top transition-colors">
-                                                <td className="px-4 py-4 sticky left-0 bg-white border-r border-slate-100 z-10 text-center font-medium text-slate-500">{idx + 1}</td>
-                                                <td className="px-4 py-4 sticky md:left-12 bg-white border-r border-slate-100 z-10 whitespace-normal min-w-[200px] font-semibold text-slate-800 md:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                                            <tr key={row.id} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors even:bg-slate-50/50 dark:even:bg-slate-800/30">
+                                                
+                                                {/* Text Wrapping applied carefully to all cells below */}
+                                                <td className="p-4 sticky left-0 bg-inherit border-r border-slate-100 dark:border-slate-700 z-10 text-center font-medium text-slate-500 dark:text-slate-400 align-top">{idx + 1}</td>
+                                                
+                                                <td className="p-4 sticky left-12 bg-inherit border-r border-slate-100 dark:border-slate-700 z-10 font-bold text-slate-900 dark:text-slate-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] align-top leading-relaxed max-w-[300px] break-words">
                                                     {row.relevantJournalArticle}
+                                                    <div className="mt-2 text-xs font-normal">
+                                                        {row.linkForBaseArticle?.startsWith('http') ? <a href={row.linkForBaseArticle} target="_blank" rel="noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">View Source &rarr;</a> : null}
+                                                    </div>
                                                 </td>
                                                 
-                                                <td className="px-4 py-4 border-r border-slate-100 whitespace-normal min-w-[150px]">{row.author}</td>
-                                                <td className="px-4 py-4 border-r border-slate-100">{row.year}</td>
-                                                <td className="px-4 py-4 border-r border-slate-100 whitespace-normal min-w-[150px] text-slate-600">{row.publisherJournalName}</td>
-                                                <td className="px-4 py-4 border-r border-slate-100">{row.journalRankIndexedJournal}</td>
-                                                <td className="px-4 py-4 border-r border-slate-100 max-w-[150px] truncate text-indigo-600 hover:underline">
-                                                    {row.linkForBaseArticle?.startsWith('http') ? <a href={row.linkForBaseArticle} target="_blank" rel="noreferrer">View Link</a> : row.linkForBaseArticle}
-                                                </td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[200px]">{row.author}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top font-medium text-indigo-600 dark:text-indigo-400">{row.year}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[200px] text-slate-600 dark:text-slate-400">{row.publisherJournalName}</td>
                                                 
-                                                <td className="px-4 py-4 border-r border-slate-100 whitespace-normal min-w-[300px] text-slate-600 bg-blue-50/20 leading-relaxed">{row.theoreticalFacts}</td>
-                                                <td className="px-4 py-4 border-r border-slate-100 whitespace-normal min-w-[300px] text-slate-600 bg-blue-50/20 leading-relaxed">{row.practicalFacts}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[400px] bg-blue-50/20 dark:bg-blue-900/5">{row.theoreticalFacts}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[400px] bg-blue-50/20 dark:bg-blue-900/5">{row.practicalFacts}</td>
                                                 
-                                                <td className="px-4 py-4 border-r border-slate-100 whitespace-normal min-w-[250px] bg-purple-50/20">{row.mainObjective}</td>
-                                                <td className="px-4 py-4 border-r border-slate-100 whitespace-normal min-w-[250px] bg-purple-50/20 text-slate-600 leading-relaxed">{row.specificObjectives}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[350px] bg-purple-50/20 dark:bg-purple-900/5">{row.mainObjective}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[350px] bg-amber-50/20 dark:bg-amber-900/5">{row.mainResearchQuestion}</td>
                                                 
-                                                <td className="px-4 py-4 border-r border-slate-100 whitespace-normal min-w-[250px] bg-amber-50/20">{row.mainResearchQuestion}</td>
-                                                <td className="px-4 py-4 border-r border-slate-100 whitespace-normal min-w-[250px] bg-amber-50/20 text-slate-600 leading-relaxed">{row.specificResearchQuestions}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[250px] bg-emerald-50/20 dark:bg-emerald-900/5">{row.population}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top font-semibold bg-emerald-50/20 dark:bg-emerald-900/5">{row.sampleSize}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[250px] bg-emerald-50/20 dark:bg-emerald-900/5">{row.dataAnalysisMethod}</td>
                                                 
-                                                <td className="px-4 py-4 border-r border-slate-100 whitespace-normal min-w-[250px] text-slate-600 leading-relaxed">{row.hypothesis}</td>
-                                                
-                                                <td className="px-4 py-4 border-r border-slate-100 whitespace-normal min-w-[180px] bg-emerald-50/20">{row.population}</td>
-                                                <td className="px-4 py-4 border-r border-slate-100 whitespace-normal min-w-[150px] bg-emerald-50/20">{row.samplingMethod}</td>
-                                                <td className="px-4 py-4 border-r border-slate-100 whitespace-normal min-w-[150px] bg-emerald-50/20 font-medium">{row.sampleSize}</td>
-                                                <td className="px-4 py-4 border-r border-slate-100 whitespace-normal min-w-[200px] bg-emerald-50/20">{row.dataAnalysisMethod}</td>
-                                                
-                                                <td className="px-4 py-4 text-center sticky right-0 bg-white z-10 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)]">
-                                                    <button onClick={() => deleteSummary(row.id)} className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors" title="Delete Row">
+                                                <td className="p-4 text-center sticky right-0 bg-inherit z-10 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)] align-middle">
+                                                    <button onClick={() => deleteSummary(row.id)} className="text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 p-2.5 rounded-xl transition-colors" title="Delete Row">
                                                         <IconTrash/>
                                                     </button>
                                                 </td>
@@ -435,8 +563,8 @@
                     </main>
 
                     {/* Footer Section */}
-                    <footer className="w-full bg-white border-t border-slate-200 py-6 mt-auto">
-                        <div className="text-center text-slate-500 text-sm">
+                    <footer className="w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-6 mt-auto transition-colors">
+                        <div className="text-center text-slate-500 dark:text-slate-400 text-sm font-medium">
                             <p>&copy; {new Date().getFullYear()} Asitha. All rights reserved.</p>
                         </div>
                     </footer>
@@ -449,14 +577,31 @@
     </script>
 
     <style>
-        /* Small animation for the instruction dropdown */
+        /* Smooth animations */
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-5px); }
+            from { opacity: 0; transform: translateY(-10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .animate-fade-in {
-            animation: fadeIn 0.2s ease-out forwards;
+        .animate-fade-in { animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        /* Custom styled scrollbars for the table */
+        .styled-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
         }
+        .styled-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .styled-scrollbar::-webkit-scrollbar-thumb {
+            background-color: rgba(156, 163, 175, 0.5);
+            border-radius: 10px;
+        }
+        .dark .styled-scrollbar::-webkit-scrollbar-thumb {
+            background-color: rgba(75, 85, 99, 0.5);
+        }
+        
+        /* Table inherit backgrounds for sticky columns */
+        td.bg-inherit { background-color: inherit; }
     </style>
 </body>
 </html>
