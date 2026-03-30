@@ -1,94 +1,41 @@
-\# LitMatrix AI 🎓
+# Scholar Scribe AI 🎓
 
+**Scholar Scribe AI** is an intelligent, client-side research tool designed to bridge the gap between academic reading and systematic literature reviews. It allows researchers to upload journal articles and instantly extract structured methodology, theoretical frameworks, and research objectives into a clean, exportable matrix.
 
+[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen.svg?style=for-the-badge)](https://paskonline.github.io/scholar-scribe-ai/)
 
-LitMatrix AI is a specialized research tool designed to help students and academics build comprehensive literature matrices in seconds. By leveraging Large Language Models (LLMs), it parses complex research papers and extracts structured data into a clean, exportable matrix.
+---
 
+## ✨ Key Features
 
+- **Automated Data Extraction:** Scans papers to extract 17 critical fields including:
+  - Theoretical & Practical Problem Backgrounds.
+  - Research Objectives (Main & Specific).
+  - Research Questions & Hypotheses.
+  - Methodology (Population, Sampling, Sample Size, Analysis Methods).
+- **Multi-Model Support:** Plug in your own API key for **Google Gemini (Free Tier supported)**, OpenAI (GPT-4o), Anthropic (Claude), or DeepSeek.
+- **Privacy-Centric:** No data is uploaded to a central server. Your API keys and research data stay in your browser's `localStorage`.
+- **Dual Format Support:** Native parsing for both `.pdf` and `.docx` files.
+- **Thesis-Ready Export:** Download your entire matrix as a `.csv` file for Excel/SPSS or save a `.json` backup of your progress.
 
-!\[License](https://img.shields.io/badge/license-MIT-blue.svg)
+## 🚀 How to Use
 
-!\[React](https://img.shields.io/badge/React-18-61DAFB?logo=react)
+1. **Access the Tool:** Visit the [Live Demo](https://paskonline.github.io/scholar-scribe-ai/).
+2. **Setup Provider:** - Click the **Info (i)** icon to see instructions on how to get a free API key.
+   - Select your provider (e.g., Gemini) and paste your key.
+3. **Upload Articles:** Drag and drop your research papers into the upload zone.
+4. **Build your Matrix:** The tool will parse the methodology section and populate the table automatically.
+5. **Export:** Click **Export CSV** to move your work into your final thesis document.
 
-!\[Tailwind](https://img.shields.io/badge/Tailwind-3.0-38B2AC?logo=tailwind-css)
+## 🛠️ Technical Stack
 
+- **Frontend:** React 18 (via UMD), Tailwind CSS.
+- **Parsers:** PDF.js (PDF extraction), Mammoth.js (.docx text processing).
+- **Architecture:** 100% Client-side (no backend required).
 
-
-\## ✨ Key Features
-
-
-
-\- \*\*Automated Extraction:\*\* Pulls 17 distinct fields including Theoretical/Practical facts, Objectives, Research Questions, Hypotheses, and Methodology.
-
-\- \*\*Multi-Model Support:\*\* Connect your own API key for \*\*Google Gemini (Free Tier supported)\*\*, OpenAI (GPT-4o), Anthropic (Claude), or DeepSeek.
-
-\- \*\*Privacy First:\*\* Your API keys and extracted data are stored in your browser's `localStorage`. No data is sent to our servers.
-
-\- \*\*File Support:\*\* Handles both `.pdf` (via PDF.js) and `.docx` (via Mammoth.js) formats.
-
-\- \*\*Academic Export:\*\* Download your entire matrix as a `.csv` file, ready for import into Excel or Google Sheets for your thesis.
-
-\- \*\*Backup \& Restore:\*\* Save your progress as a `.json` backup and resume on any device.
-
-
-
-\## 🚀 Getting Started
-
-
-
-1\. \*\*Clone or Download:\*\* Save the `index.html` file to your computer.
-
-2\. \*\*Open in Browser:\*\* Simply double-click the file to open it in Chrome, Edge, or Firefox.
-
-3\. \*\*Connect AI:\*\* - Click the \*\*Info (i)\*\* icon to find links for obtaining a free Gemini API key or other provider keys.
-
-&#x20;  - Enter and save your key.
-
-4\. \*\*Upload:\*\* Drag and drop your research papers into the upload zone.
-
-5\. \*\*Analyze:\*\* Watch the matrix populate in real-time.
-
-
-
-\## 📊 Extracted Fields
-
-\- Relevant Journal Article \& Author(s)
-
-\- Year \& Publisher/Journal Name
-
-\- Journal Rank (Scopus/Indexing)
-
-\- Theoretical \& Practical Problem Background
-
-\- Main \& Specific Objectives/Research Questions
-
-\- Hypotheses \& Data Analysis Methods
-
-\- Population, Sampling Method, \& Sample Size
-
-
-
-\## 🛠️ Built With
-
-\- \*\*React 18\*\* (via UMD)
-
-\- \*\*Tailwind CSS\*\* (Styling)
-
-\- \*\*PDF.js\*\* (PDF Parsing)
-
-\- \*\*Mammoth.js\*\* (Docx Parsing)
-
-\- \*\*Babel\*\* (In-browser JSX transformation)
-
-
-
-\## ⚖️ License
+## ⚖️ License
 
 Distributed under the MIT License. See `LICENSE.md` for more information.
 
-
-
-\---
-
-\*Created by Asitha - Built for the modern researcher.\*
-
+---
+*Created by Asitha - Empowering researchers through AI.*
