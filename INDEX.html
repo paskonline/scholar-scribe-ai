@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LitMatrix AI</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        indigo: { 950: '#1e1b4b' }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Parsers -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
+
+    <script>
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 font-sans min-h-screen flex flex-col transition-colors duration-300">
+    <div id="root" class="flex flex-col flex-grow"></div>
+
+    <script type="text/babel" data-type="module">
+        const { useState, useEffect, useRef } = React;
+
+        // --- Icons ---
+        const IconBook = () => <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>;
+        const IconUpload = () => <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>;
+        const IconDownload = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>;
+        const IconSave = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>;
+        const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>;
+        const IconInfo = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
+        const IconVideo = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>;
+        const IconMoon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>;
+        const IconSun = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>;
+
+        // --- Inline Tooltip Button Component ---
+        const TooltipButton = ({ icon, text, tooltip, onClick, className, asLabel, children }) => {
+            const content = (
+                <div className="relative group flex flex-col items-center">
+                    {/* Added whitespace-nowrap and strictly flex-row so 'i' never drops down */}
+                    <div className={`flex flex-row items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all cursor-pointer shadow-sm active:scale-95 whitespace-nowrap ${className}`} onClick={!asLabel ? onClick : undefined}>
+                        {icon} 
+                        <span className="hidden md:inline font-medium">{text}</span>
+                        <div className="flex items-center opacity-60 ml-0.5"><IconInfo className="w-3.5 h-3.5" /></div>
+                        {children}
+                    </div>
+                    {/* Tooltip Dropdown */}
+                    <div className="absolute top-full mt-2 hidden group-hover:block w-48 p-2.5 bg-slate-800 dark:bg-slate-700 text-white text-xs rounded-xl shadow-xl z-50 text-center animate-fade-in border border-slate-600 whitespace-normal">
+                        {tooltip}
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-slate-800 dark:border-b-slate-700"></div>
+                    </div>
+                </div>
+            );
+            return asLabel ? <label className="cursor-pointer">{content}</label> : content;
+        };
+
+        // --- API Key Help Modal Component ---
+        const ApiHelpModal = ({ onClose }) => {
+            return (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                        
+                        {/* Header */}
+                        <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <IconInfo className="w-6 h-6 text-indigo-500" /> How to get your API Keys
+                            </h3>
+                            <button onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-500 dark:text-slate-400">
+                                ✕
+                            </button>
+                        </div>
+                        
+                        {/* Scrollable Content */}
+                        <div className="p-6 overflow-y-auto styled-scrollbar space-y-8 bg-white dark:bg-slate-800">
+                            
+                            {/* Gemini Section */}
+                            <section>
+                                <h4 className="font-bold text-lg text-emerald-600 dark:text-emerald-400 mb-2 border-b border-slate-100 dark:border-slate-700 pb-1">1. Google Gemini (Recommended & Free)</h4>
+                                <ol className="list-decimal ml-5 space-y-1.5 mb-3 text-slate-600 dark:text-slate-300">
+                                    <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="underline font-semibold text-indigo-600 dark:text-indigo-400">Google AI Studio</a>.</li>
+                                    <li>Sign in using your standard Google Account.</li>
+                                    <li>Click the <strong>"Create API key"</strong> button.</li>
+                                    <li>Click <strong>"Create API key in a new project"</strong>.</li>
+                                    <li>Copy the key (starts with <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">AIzaSy...</code>) and paste it into the app.</li>
+                                </ol>
+                                <a href="https://www.youtube.com/results?search_query=how+to+get+google+gemini+api+key" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-sm font-medium">
+                                    <IconVideo/> Watch Video Guide for Gemini
+                                </a>
+                            </section>
+
+                            {/* OpenAI Section */}
+                            <section>
+                                <h4 className="font-bold text-lg text-slate-800 dark:text-white mb-2 border-b border-slate-100 dark:border-slate-700 pb-1">2. OpenAI (ChatGPT / GPT-4o)</h4>
+                                <ol className="list-decimal ml-5 space-y-1.5 mb-3 text-slate-600 dark:text-slate-300">
+                                    <li>Go to <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="underline font-semibold text-indigo-600 dark:text-indigo-400">OpenAI API Platform</a>.</li>
+                                    <li>Log in with your OpenAI account.</li>
+                                    <li>Click on <strong>"Create new secret key"</strong>.</li>
+                                    <li>Give it a name, copy the key (starts with <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">sk-...</code>), and paste it into the app. You must have credits on your account to use it.</li>
+                                </ol>
+                                <a href="https://www.youtube.com/results?search_query=how+to+get+openai+api+key" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-sm font-medium">
+                                    <IconVideo/> Watch Video Guide for OpenAI
+                                </a>
+                            </section>
+
+                            {/* Anthropic Section */}
+                            <section>
+                                <h4 className="font-bold text-lg text-orange-600 dark:text-orange-400 mb-2 border-b border-slate-100 dark:border-slate-700 pb-1">3. Anthropic (Claude)</h4>
+                                <ol className="list-decimal ml-5 space-y-1.5 mb-3 text-slate-600 dark:text-slate-300">
+                                    <li>Go to the <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" className="underline font-semibold text-indigo-600 dark:text-indigo-400">Anthropic Console</a>.</li>
+                                    <li>Log in with your Anthropic account.</li>
+                                    <li>Click on <strong>"Create Key"</strong> in the API Keys section.</li>
+                                    <li>Copy the secret key and paste it into the app. Note: API requires billing setup.</li>
+                                </ol>
+                                <a href="https://www.youtube.com/results?search_query=how+to+get+anthropic+claude+api+key" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-sm font-medium">
+                                    <IconVideo/> Watch Video Guide for Claude
+                                </a>
+                            </section>
+
+                            {/* DeepSeek Section */}
+                            <section>
+                                <h4 className="font-bold text-lg text-blue-600 dark:text-blue-400 mb-2 border-b border-slate-100 dark:border-slate-700 pb-1">4. DeepSeek AI</h4>
+                                <ol className="list-decimal ml-5 space-y-1.5 mb-3 text-slate-600 dark:text-slate-300">
+                                    <li>Go to the <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer" className="underline font-semibold text-indigo-600 dark:text-indigo-400">DeepSeek Platform</a>.</li>
+                                    <li>Sign in or create an account.</li>
+                                    <li>Navigate to "API Keys" on the left menu.</li>
+                                    <li>Click <strong>"Create new API key"</strong>, copy it, and paste it into our app.</li>
+                                </ol>
+                                <a href="https://www.youtube.com/results?search_query=how+to+get+deepseek+api+key" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-sm font-medium">
+                                    <IconVideo/> Watch Video Guide for DeepSeek
+                                </a>
+                            </section>
+
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        function App() {
+            // State
+            const [provider, setProvider] = useState(() => localStorage.getItem('nsbm_lit_provider') || 'gemini');
+            const [apiKey, setApiKey] = useState(() => localStorage.getItem('nsbm_lit_key') || '');
+            const [isKeySaved, setIsKeySaved] = useState(() => !!localStorage.getItem('nsbm_lit_key'));
+            const [showApiModal, setShowApiModal] = useState(false);
+            const [summaries, setSummaries] = useState(() => {
+                const saved = localStorage.getItem('nsbm_lit_data');
+                return saved ? JSON.parse(saved) : [];
+            });
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [progressText, setProgressText] = useState('');
+            const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
+            
+            const fileInputRef = useRef(null);
+            const importInputRef = useRef(null);
+
+            // Theme Effect
+            useEffect(() => {
+                if (darkMode) {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
+                }
+            }, [darkMode]);
+
+            // Save data to localStorage
+            useEffect(() => {
+                localStorage.setItem('nsbm_lit_data', JSON.stringify(summaries));
+            }, [summaries]);
+
+            const handleSaveKey = () => {
+                if (apiKey.trim()) {
+                    localStorage.setItem('nsbm_lit_key', apiKey.trim());
+                    localStorage.setItem('nsbm_lit_provider', provider);
+                    setIsKeySaved(true);
+                }
+            };
+
+            const handleClearKey = () => {
+                localStorage.removeItem('nsbm_lit_key');
+                setApiKey('');
+                setIsKeySaved(false);
+            };
+
+            const handleProviderChange = (e) => {
+                setProvider(e.target.value);
+                setApiKey(''); // Clear key input when switching providers
+                setIsKeySaved(false);
+            };
+
+            const extractTextFromFile = async (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        const arrayBuffer = e.target.result;
+                        try {
+                            if (file.type === 'application/pdf') {
+                                setProgressText('Reading PDF text...');
+                                const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                                let fullText = '';
+                                const maxPages = Math.min(pdf.numPages, 12); 
+                                for (let i = 1; i <= maxPages; i++) {
+                                    const page = await pdf.getPage(i);
+                                    const textContent = await page.getTextContent();
+                                    fullText += textContent.items.map(item => item.str).join(' ') + '\n';
+                                }
+                                resolve(fullText);
+                            } else if (file.name.endsWith('.docx')) {
+                                setProgressText('Reading Word Document...');
+                                const result = await window.mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+                                resolve(result.value);
+                            } else {
+                                reject(new Error("Please upload a PDF or DOCX file."));
+                            }
+                        } catch (err) {
+                            reject(err);
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                });
+            };
+
+            const callAI = async (promptText) => {
+                const schemaObj = {
+                    relevantJournalArticle: "Title of the journal article",
+                    author: "Authors",
+                    year: "Year",
+                    publisherJournalName: "Journal/Publisher name",
+                    journalRankIndexedJournal: "Rank/Indexing status (e.g., Scopus)",
+                    linkForBaseArticle: "DOI or URL",
+                    theoreticalFacts: "Theoretical facts of problem background with citations",
+                    practicalFacts: "Practical facts of problem background with citations",
+                    mainObjective: "Main objective",
+                    specificObjectives: "Specific objectives",
+                    mainResearchQuestion: "Main research question",
+                    specificResearchQuestions: "Specific research questions",
+                    hypothesis: "Hypotheses",
+                    population: "Target population",
+                    samplingMethod: "Sampling method",
+                    sampleSize: "Exact sample size",
+                    dataAnalysisMethod: "Data analysis method"
+                };
+
+                const systemPromptStr = `You are an expert academic research assistant. Extract data accurately from the provided research paper into a JSON object. If a field is not explicitly mentioned, output 'Not explicitly stated'. The output MUST be a valid JSON object matching this exact structure keys: ${JSON.stringify(Object.keys(schemaObj))}. Do not include markdown formatting like \`\`\`json.`;
+
+                try {
+                    if (provider === 'gemini') {
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+                        const payload = {
+                            contents: [{ parts: [{ text: promptText }] }],
+                            generationConfig: { 
+                                responseMimeType: "application/json", 
+                                responseSchema: {
+                                    type: "OBJECT",
+                                    properties: Object.keys(schemaObj).reduce((acc, key) => {
+                                        acc[key] = { type: "STRING", description: schemaObj[key] };
+                                        return acc;
+                                    }, {})
+                                }
+                            },
+                            systemInstruction: { parts: [{ text: "Extract data accurately from the provided research paper into the specified structure. If a field is not explicitly mentioned, output 'Not explicitly stated'." }] }
+                        };
+
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        
+                        if (!response.ok) throw new Error("Gemini API Error. Check your key or quota.");
+                        const data = await response.json();
+                        return JSON.parse(data.candidates[0].content.parts[0].text);
+
+                    } else if (provider === 'openai') {
+                        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json', 
+                                'Authorization': `Bearer ${apiKey}` 
+                            },
+                            body: JSON.stringify({
+                                model: 'gpt-4o-mini',
+                                response_format: { type: 'json_object' },
+                                messages: [
+                                    { role: 'system', content: systemPromptStr },
+                                    { role: 'user', content: promptText }
+                                ]
+                            })
+                        });
+                        if (!res.ok) throw new Error("OpenAI API Error. Check your API key.");
+                        const data = await res.json();
+                        return JSON.parse(data.choices[0].message.content);
+
+                    } else if (provider === 'deepseek') {
+                        const res = await fetch('https://api.deepseek.com/chat/completions', {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json', 
+                                'Authorization': `Bearer ${apiKey}` 
+                            },
+                            body: JSON.stringify({
+                                model: 'deepseek-chat',
+                                response_format: { type: 'json_object' },
+                                messages: [
+                                    { role: 'system', content: systemPromptStr },
+                                    { role: 'user', content: promptText }
+                                ]
+                            })
+                        });
+                        if (!res.ok) throw new Error("DeepSeek API Error. Check your API key.");
+                        const data = await res.json();
+                        return JSON.parse(data.choices[0].message.content);
+
+                    } else if (provider === 'anthropic') {
+                        const res = await fetch('https://api.anthropic.com/v1/messages', {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json', 
+                                'x-api-key': apiKey,
+                                'anthropic-version': '2023-06-01',
+                                'anthropic-dangerous-direct-browser-access': 'true'
+                            },
+                            body: JSON.stringify({
+                                model: 'claude-3-haiku-20240307',
+                                max_tokens: 2000,
+                                system: systemPromptStr,
+                                messages: [
+                                    { role: 'user', content: promptText + "\n\nReturn ONLY a valid JSON object." }
+                                ]
+                            })
+                        });
+                        if (!res.ok) throw new Error("Anthropic API Error. Check your API key.");
+                        const data = await res.json();
+                        let content = data.content[0].text;
+                        content = content.replace(/```json/g, '').replace(/```/g, '').trim();
+                        return JSON.parse(content);
+                    }
+                } catch (error) {
+                    console.error("AI Provider Error:", error);
+                    throw error;
+                }
+            };
+
+            const handleFileUpload = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                if (!isKeySaved) return alert("Please save your API Key first!");
+
+                setIsProcessing(true);
+                try {
+                    const text = await extractTextFromFile(file);
+                    const truncatedText = text.substring(0, 60000); 
+                    
+                    setProgressText(`Analyzing with ${provider.toUpperCase()}...`);
+                    const summaryData = await callAI(`Analyze the following research paper and extract details for a literature matrix:\n\n${truncatedText}`);
+                    
+                    setProgressText('Saving...');
+                    const newEntry = { id: Date.now(), ...summaryData };
+                    setSummaries(prev => [newEntry, ...prev]);
+                    
+                    setProgressText('Done!');
+                } catch (error) {
+                    alert("Error: " + error.message);
+                }
+                
+                setIsProcessing(false);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            };
+
+            const deleteSummary = (id) => {
+                // confirm() popup is blocked by secure iframes, so we delete directly
+                setSummaries(prev => prev.filter(s => s.id !== id));
+            };
+
+            // EXPORTS
+            const exportToCSV = () => {
+                if (summaries.length === 0) return;
+                const headers = [
+                    "No", "Relevant Journal Article", "Author", "Year", "Publisher / Journal Name", 
+                    "Journal Rank / Indexed Journal", "Link for the Base Article", 
+                    "Theoretical Facts", "Practical Facts", 
+                    "Main Objective", "Specific Objectives", 
+                    "Main Research Question", "Specific Research Questions", 
+                    "Hypothesis", "Population", "Sampling Method", "Sample Size", "Data Analysis Method"
+                ];
+                
+                const csvRows = [headers.join(",")];
+                summaries.forEach((row, index) => {
+                    const values = [
+                        index + 1,
+                        `"${(row.relevantJournalArticle || '').replace(/"/g, '""')}"`,
+                        `"${(row.author || '').replace(/"/g, '""')}"`,
+                        `"${(row.year || '').replace(/"/g, '""')}"`,
+                        `"${(row.publisherJournalName || '').replace(/"/g, '""')}"`,
+                        `"${(row.journalRankIndexedJournal || '').replace(/"/g, '""')}"`,
+                        `"${(row.linkForBaseArticle || '').replace(/"/g, '""')}"`,
+                        `"${(row.theoreticalFacts || '').replace(/"/g, '""')}"`,
+                        `"${(row.practicalFacts || '').replace(/"/g, '""')}"`,
+                        `"${(row.mainObjective || '').replace(/"/g, '""')}"`,
+                        `"${(row.specificObjectives || '').replace(/"/g, '""')}"`,
+                        `"${(row.mainResearchQuestion || '').replace(/"/g, '""')}"`,
+                        `"${(row.specificResearchQuestions || '').replace(/"/g, '""')}"`,
+                        `"${(row.hypothesis || '').replace(/"/g, '""')}"`,
+                        `"${(row.population || '').replace(/"/g, '""')}"`,
+                        `"${(row.samplingMethod || '').replace(/"/g, '""')}"`,
+                        `"${(row.sampleSize || '').replace(/"/g, '""')}"`,
+                        `"${(row.dataAnalysisMethod || '').replace(/"/g, '""')}"`
+                    ];
+                    csvRows.push(values.join(","));
+                });
+
+                const link = document.createElement("a");
+                link.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csvRows.join("\n"));
+                link.download = "LitMatrix_Export.csv";
+                link.click();
+            };
+
+            const exportBackup = () => {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(summaries));
+                const link = document.createElement("a");
+                link.href = dataStr;
+                link.download = "LitMatrix_Backup.json";
+                link.click();
+            };
+
+            const importBackup = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const importedData = JSON.parse(e.target.result);
+                        setSummaries(prev => [...importedData, ...prev]);
+                    } catch (err) {
+                        alert("Invalid backup file.");
+                    }
+                };
+                reader.readAsText(file);
+                if (importInputRef.current) importInputRef.current.value = '';
+            };
+
+            return (
+                <div className="flex-grow flex flex-col">
+                    {/* Render the Modal if state is true */}
+                    {showApiModal && <ApiHelpModal onClose={() => setShowApiModal(false)} />}
+
+                    {/* Header */}
+                    <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4 sticky top-0 z-50 transition-colors">
+                        <div className="max-w-[1600px] mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+                            
+                            <div className="flex items-center gap-3">
+                                <div className="bg-indigo-600 dark:bg-indigo-500 p-2 rounded-xl text-white shadow-md">
+                                    {/* Updated Book Icon */}
+                                    <IconBook />
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">LitMatrix AI</h1>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Research Assistant</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center flex-wrap gap-2 sm:gap-4 w-full sm:w-auto pb-2 sm:pb-0">
+                                {/* Actions with Tooltips */}
+                                <TooltipButton 
+                                    icon={<IconSave className="w-4 h-4" />} 
+                                    text="Backup" 
+                                    tooltip="Download your matrix as a JSON file to save locally." 
+                                    onClick={exportBackup} 
+                                    className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700" 
+                                />
+                                <TooltipButton 
+                                    asLabel 
+                                    icon={<IconUpload className="w-4 h-4" />} 
+                                    text="Restore" 
+                                    tooltip="Upload a previously saved JSON backup to merge into your current view." 
+                                    className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                                >
+                                    <input type="file" accept=".json" onChange={importBackup} ref={importInputRef} className="hidden" />
+                                </TooltipButton>
+                                <TooltipButton 
+                                    icon={<IconDownload className="w-4 h-4" />} 
+                                    text="Export CSV" 
+                                    tooltip="Export your completed matrix to Excel for your thesis." 
+                                    onClick={exportToCSV} 
+                                    className="bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-800/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800" 
+                                />
+                                
+                                <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 mx-1 shrink-0"></div>
+                                
+                                {/* Theme */}
+                                <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors shrink-0" title="Toggle Dark Mode">
+                                    {darkMode ? <IconSun /> : <IconMoon />}
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="p-4 md:p-8 flex-grow flex flex-col mx-auto w-full max-w-[1600px] gap-6">
+                        
+                        {/* API Key Panel (Glassmorphism) */}
+                        <div className="w-full max-w-2xl mx-auto">
+                            {!isKeySaved ? (
+                                <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-md border border-slate-200 dark:border-slate-700 p-6 rounded-2xl shadow-sm">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <h2 className="text-lg font-bold text-slate-800 dark:text-white">1. Connect AI Provider</h2>
+                                            {/* Info Button opening the modal */}
+                                            <button 
+                                                onClick={() => setShowApiModal(true)} 
+                                                className="text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-400 transition-colors p-1 bg-indigo-50 dark:bg-indigo-900/30 rounded-full"
+                                                title="How to get a key?"
+                                            >
+                                                <IconInfo className="w-4 h-4"/>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex flex-col gap-4">
+                                        <div className="flex flex-col sm:flex-row gap-3">
+                                            <select 
+                                                value={provider} 
+                                                onChange={handleProviderChange}
+                                                className="border border-slate-300 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-slate-50 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner sm:w-1/3"
+                                            >
+                                                <option value="gemini">Gemini (Recommended)</option>
+                                                <option value="openai">OpenAI (ChatGPT)</option>
+                                                <option value="anthropic">Anthropic (Claude)</option>
+                                                <option value="deepseek">DeepSeek AI</option>
+                                            </select>
+                                            
+                                            <input 
+                                                type="password" 
+                                                value={apiKey} 
+                                                onChange={(e) => setApiKey(e.target.value)} 
+                                                placeholder={`Enter your ${provider === 'gemini' ? 'Gemini' : provider === 'openai' ? 'OpenAI' : provider === 'anthropic' ? 'Anthropic' : 'DeepSeek'} API key`}
+                                                className="border border-slate-300 dark:border-slate-600 rounded-xl px-4 py-2.5 flex-grow focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-900 dark:text-white transition-all shadow-inner" 
+                                            />
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">Key is stored securely in your browser's local storage.</p>
+                                            <button onClick={handleSaveKey} className="bg-indigo-600 text-white px-6 py-2 rounded-xl hover:bg-indigo-700 font-medium transition-colors shadow-sm">
+                                                Save Key
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex justify-end items-center">
+                                    <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-2 rounded-full border border-emerald-200 dark:border-emerald-800/50 mr-4 font-medium shadow-sm">
+                                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div> 
+                                        <span className="capitalize">{provider}</span> Connected
+                                    </div>
+                                    <button onClick={handleClearKey} className="text-xs text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors">Change Provider/Key</button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Drag & Drop Upload */}
+                        <div className={`bg-white dark:bg-slate-800 border-2 border-dashed ${isProcessing ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-slate-700'} rounded-3xl p-8 md:p-12 text-center relative transition-all shadow-sm w-full max-w-2xl mx-auto group`}>
+                            <input type="file" ref={fileInputRef} accept=".pdf,.docx" onChange={handleFileUpload} disabled={isProcessing || !isKeySaved} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10" />
+                            <div className="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400">
+                                {isProcessing ? (
+                                    <div className="flex flex-col items-center">
+                                        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                                        <div className="font-semibold text-indigo-700 dark:text-indigo-400 animate-pulse">{progressText}</div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className={`mb-4 transition-transform group-hover:-translate-y-1 ${isKeySaved ? 'text-indigo-500' : 'text-slate-300 dark:text-slate-600'}`}><IconUpload/></div>
+                                        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">2. Drop Journal Article Here</h2>
+                                        <p className="text-sm">We'll read the methodology and add it to your matrix.</p>
+                                        {!isKeySaved && <p className="text-xs text-red-500 dark:text-red-400 mt-3 font-medium">Please enter an API Key first</p>}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* --- Mobile Card View (< md screens) --- */}
+                        <div className="md:hidden space-y-4 pb-10">
+                            {summaries.length === 0 && (
+                                <div className="text-center py-10 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                    No articles summarized yet. Upload your first PDF.
+                                </div>
+                            )}
+                            {summaries.map((row, idx) => (
+                                <div key={row.id} className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col gap-3 relative overflow-hidden">
+                                    <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-500"></div>
+                                    <div className="flex justify-between items-start">
+                                        <h3 className="font-bold text-slate-800 dark:text-slate-100 pr-8 leading-tight">{row.relevantJournalArticle}</h3>
+                                        <button onClick={() => deleteSummary(row.id)} className="text-slate-400 hover:text-red-500 bg-slate-50 dark:bg-slate-700 p-2 rounded-lg absolute top-4 right-4"><IconTrash/></button>
+                                    </div>
+                                    <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">{row.author} ({row.year})</p>
+                                    
+                                    <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-3 text-sm space-y-2 mt-2">
+                                        <p><span className="font-semibold text-slate-700 dark:text-slate-300">Journal:</span> {row.publisherJournalName}</p>
+                                        <p><span className="font-semibold text-slate-700 dark:text-slate-300">Objectives:</span> {row.mainObjective}</p>
+                                        <p><span className="font-semibold text-slate-700 dark:text-slate-300">Methodology:</span> {row.sampleSize} ({row.population}) using {row.dataAnalysisMethod}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 italic mt-2">* View on desktop to see all 17 extracted columns</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* --- Desktop Table View (>= md screens) --- */}
+                        <div className="hidden md:flex bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex-grow h-[60vh] relative overflow-hidden flex-col">
+                            <div className="overflow-x-auto overflow-y-auto flex-grow styled-scrollbar">
+                                <table className="w-full text-sm text-left border-collapse">
+                                    <thead className="bg-slate-100 dark:bg-slate-900/80 text-slate-600 dark:text-slate-400 uppercase text-xs font-bold border-b border-slate-200 dark:border-slate-700 sticky top-0 z-20 shadow-sm backdrop-blur-md">
+                                        <tr>
+                                            <th className="p-4 sticky left-0 bg-slate-100 dark:bg-slate-900 z-30 border-r border-slate-200 dark:border-slate-700 text-center w-12">No</th>
+                                            <th className="p-4 sticky left-12 bg-slate-100 dark:bg-slate-900 z-30 border-r border-slate-200 dark:border-slate-700 w-64 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]">Article Title</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 min-w-[150px]">Author</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700">Year</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 min-w-[150px]">Journal Name</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 min-w-[150px]">Journal Rank / Indexed</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 min-w-[150px]">Base Article Link</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-blue-50/50 dark:bg-blue-900/10 text-blue-800 dark:text-blue-300 min-w-[300px]">Theoretical Facts</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-blue-50/50 dark:bg-blue-900/10 text-blue-800 dark:text-blue-300 min-w-[300px]">Practical Facts</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-purple-50/50 dark:bg-purple-900/10 text-purple-800 dark:text-purple-300 min-w-[250px]">Main Objective</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-purple-50/50 dark:bg-purple-900/10 text-purple-800 dark:text-purple-300 min-w-[250px]">Specific Objectives</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-amber-50/50 dark:bg-amber-900/10 text-amber-800 dark:text-amber-300 min-w-[250px]">Main RQ</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-amber-50/50 dark:bg-amber-900/10 text-amber-800 dark:text-amber-300 min-w-[250px]">Specific RQs</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 min-w-[250px]">Hypothesis</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-emerald-50/50 dark:bg-emerald-900/10 text-emerald-800 dark:text-emerald-300 min-w-[180px]">Population</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-emerald-50/50 dark:bg-emerald-900/10 text-emerald-800 dark:text-emerald-300 min-w-[150px]">Sampling Method</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-emerald-50/50 dark:bg-emerald-900/10 text-emerald-800 dark:text-emerald-300 min-w-[150px]">Sample Size</th>
+                                            <th className="p-4 border-r border-slate-200 dark:border-slate-700 bg-emerald-50/50 dark:bg-emerald-900/10 text-emerald-800 dark:text-emerald-300 min-w-[200px]">Analysis Method</th>
+                                            <th className="p-4 text-center sticky right-0 bg-slate-100 dark:bg-slate-900 z-30 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] dark:shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.5)]">Delete</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-slate-700 dark:text-slate-300">
+                                        {summaries.length === 0 && (
+                                            <tr><td colSpan="19" className="text-center py-20 text-slate-400 dark:text-slate-500">No articles summarized yet. Upload a document to begin filling your matrix.</td></tr>
+                                        )}
+                                        {summaries.map((row, idx) => (
+                                            <tr key={row.id} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors even:bg-slate-50/50 dark:even:bg-slate-800/30">
+                                                
+                                                <td className="p-4 sticky left-0 bg-inherit border-r border-slate-100 dark:border-slate-700 z-10 text-center font-medium text-slate-500 dark:text-slate-400 align-top">{idx + 1}</td>
+                                                
+                                                <td className="p-4 sticky left-12 bg-inherit border-r border-slate-100 dark:border-slate-700 z-10 font-bold text-slate-900 dark:text-slate-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] align-top leading-relaxed max-w-[300px] break-words">
+                                                    {row.relevantJournalArticle}
+                                                </td>
+                                                
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[200px]">{row.author}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top font-medium text-indigo-600 dark:text-indigo-400">{row.year}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[200px] text-slate-600 dark:text-slate-400">{row.publisherJournalName}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top text-slate-600 dark:text-slate-400">{row.journalRankIndexedJournal}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top break-words max-w-[150px]">
+                                                    {row.linkForBaseArticle?.startsWith('http') ? <a href={row.linkForBaseArticle} target="_blank" rel="noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">Link &rarr;</a> : row.linkForBaseArticle}
+                                                </td>
+                                                
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[400px] bg-blue-50/20 dark:bg-blue-900/5">{row.theoreticalFacts}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[400px] bg-blue-50/20 dark:bg-blue-900/5">{row.practicalFacts}</td>
+                                                
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[350px] bg-purple-50/20 dark:bg-purple-900/5">{row.mainObjective}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[350px] bg-purple-50/20 dark:bg-purple-900/5">{row.specificObjectives}</td>
+                                                
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[350px] bg-amber-50/20 dark:bg-amber-900/5">{row.mainResearchQuestion}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[350px] bg-amber-50/20 dark:bg-amber-900/5">{row.specificResearchQuestions}</td>
+                                                
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[350px]">{row.hypothesis}</td>
+
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[250px] bg-emerald-50/20 dark:bg-emerald-900/5">{row.population}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[200px] bg-emerald-50/20 dark:bg-emerald-900/5">{row.samplingMethod}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top font-semibold bg-emerald-50/20 dark:bg-emerald-900/5">{row.sampleSize}</td>
+                                                <td className="p-4 border-r border-slate-100 dark:border-slate-700 align-top leading-relaxed whitespace-normal break-words max-w-[250px] bg-emerald-50/20 dark:bg-emerald-900/5">{row.dataAnalysisMethod}</td>
+                                                
+                                                <td className="p-4 text-center sticky right-0 bg-inherit z-10 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)] align-middle">
+                                                    <button onClick={() => deleteSummary(row.id)} className="text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 p-2.5 rounded-xl transition-colors" title="Delete Row">
+                                                        <IconTrash/>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* Footer Section */}
+                    <footer className="w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-6 mt-auto transition-colors">
+                        <div className="text-center text-slate-500 dark:text-slate-400 text-sm font-medium">
+                            <p>&copy; {new Date().getFullYear()} Asitha. All rights reserved.</p>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+
+    <style>
+        /* Smooth animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        /* Custom styled scrollbars for the table */
+        .styled-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .styled-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .styled-scrollbar::-webkit-scrollbar-thumb {
+            background-color: rgba(156, 163, 175, 0.5);
+            border-radius: 10px;
+        }
+        .dark .styled-scrollbar::-webkit-scrollbar-thumb {
+            background-color: rgba(75, 85, 99, 0.5);
+        }
+        
+        /* Table inherit backgrounds for sticky columns */
+        td.bg-inherit { background-color: inherit; }
+    </style>
+</body>
+</html>
